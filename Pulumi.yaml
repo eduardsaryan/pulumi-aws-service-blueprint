@@ -1,0 +1,3 @@
+name: pulumi-aws-service-blueprint
+runtime: nodejs
+description: Small AWS ECS/Fargate service blueprint

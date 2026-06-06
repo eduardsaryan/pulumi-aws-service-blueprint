@@ -1,93 +1,260 @@
-# pulumi-aws-service-blueprint
+# Pulumi AWS Service Blueprint
 
+Small Pulumi blueprint for running a container service on AWS
 
+It creates a simple ECS/Fargate service behind an Application Load Balancer. The default layout uses public subnets and no NAT Gateway, so the first preview stays easy to understand and avoids the usual NAT cost surprise
 
-## Getting started
+This is intentionally separate from the OpenTofu starter kit. Same AWS target, different IaC model
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## What It Creates
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+- VPC with two public subnets
+- Internet Gateway and public route table
+- Application Load Balancer
+- ECS cluster
+- Fargate task definition and service
+- CloudWatch log group
+- IAM execution role
+- security groups for the load balancer and service
 
-## Add your files
+## Default Settings
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+| Setting | Default |
+| --- | --- |
+| AWS region | `us-east-1` |
+| VPC CIDR | `10.30.0.0/16` |
+| public subnet A | `10.30.0.0/20` in `us-east-1a` |
+| public subnet B | `10.30.16.0/20` in `us-east-1b` |
+| container image | `nginx:1.27-alpine` |
+| container port | `80` |
+| desired task count | `1` |
+| task CPU | `256` |
+| task memory | `512` |
+| health check path | `/` |
 
+Tasks run in public subnets with public IPs enabled. There is no NAT Gateway in the default layout
+
+## Prerequisites
+
+Use a test AWS account. Do not start with a production account
+
+Required local tools:
+
+- Node.js 20 or newer
+- npm
+- Pulumi CLI
+- AWS CLI
+
+Required AWS access:
+
+- an AWS account you can create test resources in
+- permission to create VPC, subnet, route table, Internet Gateway, ALB, ECS, IAM role, CloudWatch Logs, and security group resources
+- one working AWS credential path:
+  - AWS SSO profile
+  - IAM access key in environment variables
+  - IAM access key configured with `aws configure`
+
+## Install Local Tools
+
+Check Node.js and npm:
+
+```bash
+node --version
+npm --version
 ```
-cd existing_repo
-git remote add origin https://code.eduardsaryan.com/eduard.saryan/pulumi-aws-service-blueprint.git
-git branch -M main
-git push -uf origin main
+
+Install Pulumi on macOS with Homebrew:
+
+```bash
+brew install pulumi
 ```
 
-## Integrate with your tools
+Install the AWS CLI on macOS with Homebrew:
 
-* [Set up project integrations](https://code.eduardsaryan.com/eduard.saryan/pulumi-aws-service-blueprint/-/settings/integrations)
+```bash
+brew install awscli
+```
 
-## Collaborate with your team
+Check both CLIs:
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+```bash
+pulumi version
+aws --version
+```
 
-## Test and Deploy
+## AWS Credentials
 
-Use the built-in continuous integration in GitLab.
+Choose one credential path
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+### AWS SSO
 
-***
+Configure the profile:
 
-# Editing this README
+```bash
+aws configure sso
+```
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+Log in:
 
-## Suggestions for a good README
+```bash
+aws sso login --profile my-sso-profile
+```
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+Use the profile for Pulumi commands:
 
-## Name
-Choose a self-explaining name for your project.
+```bash
+export AWS_PROFILE=my-sso-profile
+aws sts get-caller-identity
+```
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+### Access Keys
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+Configure a local AWS CLI profile:
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+```bash
+aws configure --profile test-account
+export AWS_PROFILE=test-account
+aws sts get-caller-identity
+```
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+Or use environment variables:
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+```bash
+export AWS_ACCESS_KEY_ID=replace-me
+export AWS_SECRET_ACCESS_KEY=replace-me
+export AWS_REGION=us-east-1
+aws sts get-caller-identity
+```
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+The `aws sts get-caller-identity` command should show the account you expect before you run `pulumi preview`
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+## Pulumi Login
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+Use the Pulumi managed backend:
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+```bash
+pulumi login
+```
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+Or use a local state directory for a disposable test:
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+```bash
+pulumi login file://~/.pulumi-local-state
+```
 
-## License
-For open source projects, say how it is licensed.
+For shared work, use Pulumi Cloud, an S3 backend, or another agreed backend instead of local state
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+## First Preview
+
+Install project dependencies:
+
+```bash
+npm install
+```
+
+Create a stack:
+
+```bash
+pulumi stack init dev
+```
+
+Set region and base config:
+
+```bash
+pulumi config set aws:region us-east-1
+pulumi config set projectName demo-service
+pulumi config set environment dev
+```
+
+The default image is `nginx:1.27-alpine`
+
+Optional config:
+
+```bash
+pulumi config set containerImage nginx:1.27-alpine
+pulumi config set containerPort 80
+pulumi config set desiredCount 1
+pulumi config set cpu 256
+pulumi config set memory 512
+pulumi config set healthCheckPath /
+pulumi config set vpcCidr 10.30.0.0/16
+pulumi config set --path 'availabilityZones[0]' us-east-1a
+pulumi config set --path 'availabilityZones[1]' us-east-1b
+pulumi config set --path 'publicSubnetCidrs[0]' 10.30.0.0/20
+pulumi config set --path 'publicSubnetCidrs[1]' 10.30.16.0/20
+```
+
+`projectName` and `environment` should use lowercase letters, numbers, and hyphens. Keep them short because AWS load balancer and target group names have tight limits
+
+Run preview:
+
+```bash
+pulumi preview
+```
+
+Read the resource list before deploying. Preview should show VPC, subnet, ALB, ECS, IAM, CloudWatch Logs, and security group resources
+
+## Deploy
+
+Deploy:
+
+```bash
+pulumi up
+```
+
+Pulumi prints the load balancer URL as `url`
+
+Verify with curl:
+
+```bash
+pulumi stack output url
+curl "$(pulumi stack output url)"
+```
+
+The default nginx service should return an HTML response
+
+## Cleanup
+
+Destroy the AWS resources:
+
+```bash
+pulumi destroy
+```
+
+Remove the local stack record:
+
+```bash
+pulumi stack rm dev
+```
+
+Check the AWS console after cleanup if a failed deploy was interrupted
+
+## Network Notes
+
+This blueprint keeps the service in public subnets with task public IPs enabled. That is acceptable for a small demo service behind an ALB, but it is not the private production pattern
+
+For a stricter production layout, move tasks to private subnets and add one of these egress paths:
+
+- NAT Gateway
+- VPC endpoints for the AWS APIs and image/log paths you use
+
+That tradeoff is left explicit because NAT Gateway has a recurring cost even when the service is idle
+
+## Repository Layout
+
+```text
+index.ts
+package.json
+Pulumi.yaml
+tsconfig.json
+```
+
+## Current Limits
+
+- HTTP only by default
+- no Route 53 record
+- no ACM certificate
+- no autoscaling policy
+- no CI workflow yet
+
+Those are good next additions after the base preview and deploy path are proven
