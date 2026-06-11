@@ -56,28 +56,71 @@ Required AWS access:
 
 ## Install Local Tools
 
-Check Node.js and npm:
+### macOS
+
+Install tools with Homebrew:
+
+```bash
+brew install node pulumi awscli
+```
+
+Check tools:
 
 ```bash
 node --version
 npm --version
+pulumi version
+aws --version
 ```
 
-Install Pulumi on macOS with Homebrew:
+Node.js must be version 20 or newer
+
+### Debian or Ubuntu
+
+Install base packages:
 
 ```bash
-brew install pulumi
+sudo apt-get update
+sudo apt-get install -y curl ca-certificates unzip
 ```
 
-Install the AWS CLI on macOS with Homebrew:
+Install Node.js 20:
 
 ```bash
-brew install awscli
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+node --version
+npm --version
 ```
 
-Check both CLIs:
+Install Pulumi:
 
 ```bash
+curl -fsSL https://get.pulumi.com | sh
+export PATH="$HOME/.pulumi/bin:$PATH"
+pulumi version
+```
+
+Install the AWS CLI:
+
+```bash
+arch="$(uname -m)"
+case "${arch}" in
+  x86_64) aws_arch="x86_64" ;;
+  aarch64|arm64) aws_arch="aarch64" ;;
+  *) echo "unsupported AWS CLI architecture: ${arch}" >&2; exit 1 ;;
+esac
+curl "https://awscli.amazonaws.com/awscli-exe-linux-${aws_arch}.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+rm -rf aws awscliv2.zip
+```
+
+Check tools:
+
+```bash
+node --version
+npm --version
 pulumi version
 aws --version
 ```
