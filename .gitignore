@@ -10,3 +10,5 @@ Pulumi.*.yaml
 
 dist/
 coverage/
+
+.claude/settings.local.json

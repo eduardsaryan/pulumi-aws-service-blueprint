@@ -1,0 +1,48 @@
+name: deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: up or destroy
+        required: true
+        default: up
+        type: choice
+        options: [up, destroy]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Required reviewers on this environment are the human approval gate
+    environment: dev
+    env:
+      PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      STACK: ${{ vars.PULUMI_STACK || 'dev' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install
+      - run: npm install --prefix policy
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: pulumi/actions@v6
+      - run: pulumi stack select "$STACK" --create
+      - name: up
+        if: inputs.action == 'up'
+        run: pulumi up --yes --diff --policy-pack policy
+      - name: destroy
+        if: inputs.action == 'destroy'
+        run: pulumi destroy --yes

@@ -6,6 +6,18 @@ It creates a simple ECS/Fargate service behind an Application Load Balancer. The
 
 This is intentionally separate from the OpenTofu starter kit. Same AWS target, different IaC model
 
+## How This Repo Is Worked On
+
+Code changes are written with Claude Code and Codex. The agent writes, a human reviews, CI checks, and a human deploys
+
+- `AGENTS.md`: rules for any coding agent: scope, forbidden commands, what "done" means
+- `CLAUDE.md` and `.claude/settings.json`: the same rules for Claude Code, with deploy, destroy, state, and git-write commands blocked at the tool level
+- `policy/`: Pulumi policy pack that runs on every preview and deploy. It blocks public ingress other than 80/443, AdministratorAccess on roles, log groups without retention, and missing tags. It warns on NAT Gateways
+- `.github/workflows/preview.yml`: TypeScript checks on every pull request, plus `pulumi preview` with a read-only AWS role once configured
+- `.github/workflows/deploy.yml`: manual deploy or destroy, gated by a GitHub environment that needs human approval before AWS credentials are issued
+
+Agents never hold deploy credentials. A broken or unsafe change is meant to be stopped by review, by a policy violation, or by the approval gate, not by trusting the agent
+
 ## What It Creates
 
 - VPC with two public subnets
@@ -40,7 +52,7 @@ Use a test AWS account. Do not start with a production account
 
 Required local tools:
 
-- Node.js 20 or newer
+- Node.js 24 or newer
 - npm
 - Pulumi CLI
 - AWS CLI
@@ -73,7 +85,7 @@ pulumi version
 aws --version
 ```
 
-Node.js must be version 20 or newer
+Node.js must be version 24 or newer
 
 ### Debian or Ubuntu
 
@@ -84,10 +96,10 @@ sudo apt-get update
 sudo apt-get install -y curl ca-certificates unzip
 ```
 
-Install Node.js 20:
+Install Node.js 24:
 
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt-get install -y nodejs
 node --version
 npm --version
@@ -193,6 +205,7 @@ Install project dependencies:
 
 ```bash
 npm install
+npm install --prefix policy
 ```
 
 Create a stack:
@@ -229,21 +242,23 @@ pulumi config set --path 'publicSubnetCidrs[1]' 10.30.16.0/20
 
 `projectName` and `environment` should use lowercase letters, numbers, and hyphens. Keep them short because AWS load balancer and target group names have tight limits
 
-Run preview:
+Run preview with the policy pack:
 
 ```bash
-pulumi preview
+pulumi preview --policy-pack policy
 ```
 
-Read the resource list before deploying. Preview should show VPC, subnet, ALB, ECS, IAM, CloudWatch Logs, and security group resources
+Read the resource list before deploying. Preview should show VPC, subnet, ALB, ECS, IAM, CloudWatch Logs, and security group resources, and no policy violations
 
 ## Deploy
 
 Deploy:
 
 ```bash
-pulumi up
+pulumi up --policy-pack policy
 ```
+
+To deploy from GitHub Actions instead, follow `ci/README.md`
 
 Pulumi prints the load balancer URL as `url`
 
@@ -286,10 +301,16 @@ That tradeoff is left explicit because NAT Gateway has a recurring cost even whe
 ## Repository Layout
 
 ```text
-index.ts
+index.ts                  service resources
 package.json
 Pulumi.yaml
 tsconfig.json
+policy/                   Pulumi policy pack
+ci/                       one-time AWS and GitHub setup for CI
+.github/workflows/        preview and deploy workflows
+AGENTS.md                 rules for coding agents
+CLAUDE.md                 Claude Code entry point
+.claude/settings.json     Claude Code command allow and deny lists
 ```
 
 ## Current Limits
@@ -298,6 +319,6 @@ tsconfig.json
 - no Route 53 record
 - no ACM certificate
 - no autoscaling policy
-- no CI workflow yet
+- no lockfile committed yet, so CI uses `npm install` instead of `npm ci`
 
 Those are good next additions after the base preview and deploy path are proven
